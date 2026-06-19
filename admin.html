@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>מרכז בקרת אירועים · Fête</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/theme.css" />
+  <link rel="icon" href="/logo.svg" />
+</head>
+<body>
+  <div id="app"></div>
+  <script src="/common.js"></script>
+  <script>
+    const ACCENT_HEX_LOCAL = ACCENT_HEX;
+    let state = {
+      authed: null,
+      events: [],
+      selectedId: null,
+      view: "edit", // "edit" | "new"
+      draft: null,
+      slugTouched: false,
+      tab: "edit",
+      guests: [],
+      guestsLoading: false,
+    };
+
+    const $ = (sel) => document.querySelector(sel);
+    const app = () => document.getElementById("app");
+
+    /* ---- Auth check ---- */
+    async function init() {
+      if (hasToken()) {
+        state.authed = true;
+      } else {
+        try {
+          const s = await fetchSession();
+          state.authed = s.authenticated;
+        } catch {
+          state.authed = false;
+        }
+      }
+      if (state.authed) {
+        await loadEvents();
+      }
+      render();
+    }
+
+    async function loadEvents() {
+      try {
+        const { events } = await fetchEvents();
+        state.events = events;
+        if (!state.selectedId || !events.find((e) => e.id === state.selectedId)) {
+          state.selectedId = events[0] ? events[0].id : null;
+        }
+      } catch (err) {
+        showToast("טעינת האירועים נכשלה", err.message, "destructive");
+      }
+    }
+
+    function selectedEvent() {
+      return state.events.find((e) => e.id === state.selectedId) || null;
+    }
+
+    /* ---- Rendering ---- */
+    function render() {
+      if (state.authed === null) {
+        app().innerHTML = '<div class="flex min-h-screen items-center justify-center"><div class="flex flex-col items-center gap-3"><div class="animate-spin" style="color:var(--primary);"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-1.5.5a2 2 0 0 1-2.55-2.55L18.5 9.5"/></svg></div><p class="text-sm" style="color:var(--muted-foreground);">בודק הפעלה…</p></div></div>';
+        return;
+      }
+      if (!state.authed) {
+        renderLogin();
+        return;
+      }
+      renderDashboard();
+    }
+
+    function renderLogin() {
+      app().innerHTML = `
+        <div class="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12" style="background:radial-gradient(60% 50% at 50% 0%, rgba(225,29,72,0.10) 0%, transparent 60%), radial-gradient(50% 40% at 80% 100%, rgba(124,58,237,0.10) 0%, transparent 60%);">
+          <div class="relative w-full max-w-md animate-fade-in-up">
+            <div class="rounded-2xl border p-8" style="border-color:var(--border);background:var(--card);box-shadow:0 20px 50px -10px rgba(0,0,0,0.15);">
+              <div class="mb-6 flex flex-col items-center text-center">
+                <div class="flex h-14 w-14 items-center justify-center rounded-2xl" style="background:var(--primary);color:var(--primary-foreground);box-shadow:0 10px 20px -5px rgba(0,0,0,0.2);">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-1.5.5a2 2 0 0 1-2.55-2.55L18.5 9.5"/></svg>
+                </div>
+                <h1 class="mt-4 text-2xl font-bold tracking-tight">כניסת מארגן</h1>
+                <p class="mt-1 text-sm" style="color:var(--muted-foreground);">התחברו כדי לנהל את אירועי המסיבה ורשימות האורחים.</p>
+              </div>
+              <form id="login-form" class="space-y-4">
+                <div>
+                  <label class="label" for="password">סיסמת מנהל</label>
+                  <div class="relative">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);color:var(--muted-foreground);"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <input class="field" id="password" type="password" placeholder="הזינו את הסיסמה" style="padding-right:2.25rem;padding-left:2.5rem;" autocomplete="current-password" autofocus />
+                    <button type="button" id="toggle-pw" style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted-foreground);">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <button type="submit" id="login-btn" class="btn btn-primary btn-lg btn-block" disabled>התחבר</button>
+              </form>
+              <a href="/" class="btn btn-ghost btn-block mt-4"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg> חזרה לאירועים</a>
+            </div>
+          </div>
+        </div>`;
+      const pw = $("#password");
+      const btn = $("#login-btn");
+      pw.addEventListener("input", () => { btn.disabled = !pw.value.trim(); });
+      $("#toggle-pw").addEventListener("click", () => {
+        pw.type = pw.type === "password" ? "text" : "password";
+      });
+      $("#login-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        btn.disabled = true;
+        btn.textContent = "מתחבר…";
+        try {
+          await login(pw.value);
+          state.authed = true;
+          await loadEvents();
+          render();
+        } catch (err) {
+          showToast("ההתחברות נכשלה", err.message, "destructive");
+          btn.disabled = false;
+          btn.textContent = "התחבר";
+        }
+      });
+    }
+
+    function renderDashboard() {
+      const sel = selectedEvent();
+      app().innerHTML = `
+        <div class="flex min-h-screen flex-col lg:flex-row">
+          <aside class="flex w-full shrink-0 flex-col border-b lg:h-screen lg:w-72 lg:border-b-0 lg:border-e" style="border-color:var(--border);background:color-mix(in srgb, var(--card) 50%, transparent);backdrop-filter:blur(4px);">
+            ${renderSidebar()}
+          </aside>
+          <main class="flex min-h-screen flex-1 flex-col">
+            <header class="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4 sm:px-6" style="border-color:var(--border);background:color-mix(in srgb, var(--background) 80%, transparent);backdrop-filter:blur(4px);">
+              ${renderHeader(sel)}
+            </header>
+            <div class="flex-1 p-4 sm:p-6" id="main-content">
+              ${renderMainContent(sel)}
+            </div>
+          </main>
+        </div>`;
+      bindDashboard(sel);
+    }
+
+    function renderSidebar() {
+      const eventsList = state.events.length === 0
+        ? '<div class="mx-1 rounded-lg border border-dashed p-4 text-center text-sm" style="border-color:var(--border);color:var(--muted-foreground);">אין עדיין אירועים. צרו את הראשון שלכם!</div>'
+        : state.events.map((e) => `
+            <li>
+              <button data-event-id="${e.id}" class="event-btn group flex w-full items-start gap-3 rounded-lg border p-3 text-right" style="border-color:${state.view === "edit" && state.selectedId === e.id ? "var(--primary)" : "transparent"};background:${state.view === "edit" && state.selectedId === e.id ? "color-mix(in srgb, var(--primary) 5%, transparent)" : "transparent"};box-shadow:${state.view === "edit" && state.selectedId === e.id ? "0 0 0 1px color-mix(in srgb, var(--primary) 30%, transparent)" : "none"};transition:all 0.15s;" onmouseover="if(!this.dataset.active)this.style.borderColor='var(--border)';this.style.background='var(--muted)';" onmouseout="if(!this.dataset.active)this.style.borderColor='transparent';this.style.background='transparent';">
+                <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md" style="background:var(--muted);color:var(--muted-foreground);">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-semibold">${escapeHtml(e.title)}</p>
+                  <div class="mt-1 flex items-center gap-2 text-[11px]" style="color:var(--muted-foreground);">
+                    <span class="inline-flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>${e.guestCount}</span>
+                    <span class="badge" style="padding:0 0.375rem;font-size:10px;">${THEME_LABELS[e.theme] || e.theme}</span>
+                  </div>
+                </div>
+              </button>
+            </li>`).join("");
+      return `
+        <div class="flex items-center justify-between gap-2 border-b p-4 lg:justify-start" style="border-color:var(--border);">
+          <a href="/" class="flex items-center gap-2 no-underline" style="color:inherit;">
+            <div class="flex h-9 w-9 items-center justify-center rounded-xl" style="background:var(--primary);color:var(--primary-foreground);">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-1.5.5a2 2 0 0 1-2.55-2.55L18.5 9.5"/></svg>
+            </div>
+            <div class="leading-tight"><p class="text-sm font-bold">Fête מנהל</p><p class="text-[11px]" style="color:var(--muted-foreground);">מרכז בקרת אירועים</p></div>
+          </a>
+        </div>
+        <div class="p-3">
+          <button id="new-event-btn" class="btn ${state.view === "new" ? "btn-primary" : "btn-outline"} btn-block" style="justify-content:flex-start;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            אירוע חדש
+          </button>
+        </div>
+        <div class="min-h-0 flex-1 overflow-y-auto themed-scroll px-3 pb-3">
+          <p class="px-2 pb-2 pt-1 text-[11px] font-semibold" style="color:var(--muted-foreground);">אירועים (${state.events.length})</p>
+          <ul class="space-y-1">${eventsList}</ul>
+        </div>
+        <div class="border-t p-3" style="border-color:var(--border);">
+          <button id="logout-btn" class="btn btn-ghost btn-block" style="justify-content:flex-start;color:var(--muted-foreground);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            התנתק
+          </button>
+        </div>`;
+    }
+
+    function renderHeader(sel) {
+      const title = state.view === "new" ? "צרו אירוע" : sel ? sel.title : state.events.length === 0 ? "בואו נתכנן מסיבה" : "בחרו אירוע";
+      const subtitle = state.view === "new" ? "מלאו את הפרטים — האורחים שלכם יראו אותם מיד." : sel ? "נהלו הזמנה ואורחים" : "בחרו אירוע מהסרגל או התחילו אחד חדש.";
+      const viewLink = sel && state.view === "edit" ? `<a href="${guestUrl(sel.slug)}" target="_blank" class="btn btn-outline btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg> צפו בדף האורח</a>` : "";
+      return `<div class="min-w-0"><h1 class="truncate text-xl font-bold sm:text-2xl">${escapeHtml(title)}</h1><p class="text-sm" style="color:var(--muted-foreground);">${escapeHtml(subtitle)}</p></div>${viewLink}`;
+    }
+
+    function renderMainContent(sel) {
+      if (state.view === "new") return renderEditor(null, true);
+      if (!sel) {
+        return `<div class="flex min-h-[50vh] flex-col items-center justify-center text-center">
+          <div class="flex h-16 w-16 items-center justify-center rounded-2xl" style="background:var(--muted);"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-foreground);"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-1.5.5a2 2 0 0 1-2.55-2.55L18.5 9.5"/></svg></div>
+          <h2 class="mt-4 text-lg font-semibold">${state.events.length === 0 ? "אין עדיין אירועים" : "לא נבחר דבר"}</h2>
+          <p class="mt-1 max-w-sm text-sm" style="color:var(--muted-foreground);">${state.events.length === 0 ? "צרו את אירוע המסיבה הראשון שלכם כדי להתחיל לאסוף אישורי הגעה." : "בחרו אירוע מהסרגל כדי לנהל אותו."}</p>
+          <button id="empty-new-btn" class="btn btn-primary mt-5"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> צרו אירוע</button>
+        </div>`;
+      }
+      // Tabs + content
+      const guestsBadge = `<span class="badge ml-2" style="padding:0 0.375rem;">${sel.guestCount}</span>`;
+      return `
+        <div class="flex gap-1 rounded-lg p-1 max-w-md" style="background:var(--muted);">
+          <button id="tab-edit" class="btn ${state.tab === "edit" ? "btn-primary" : "btn-ghost"} btn-sm" style="flex:1;box-shadow:${state.tab === "edit" ? "0 1px 2px rgba(0,0,0,0.1)" : "none"};"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg> הזמנה</button>
+          <button id="tab-guests" class="btn ${state.tab === "guests" ? "btn-primary" : "btn-ghost"} btn-sm" style="flex:1;box-shadow:${state.tab === "guests" ? "0 1px 2px rgba(0,0,0,0.1)" : "none"};"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/></svg> אורחים ${guestsBadge}</button>
+        </div>
+        <div class="mt-6" id="tab-content">${state.tab === "edit" ? renderEditor(sel, false) : renderGuestList(sel)}</div>`;
+    }
+
+    function renderEditor(event, isNew) {
+      const d = state.draft || (event ? toDraft(event) : EMPTY_DRAFT());
+      if (!state.draft) state.draft = d;
+      const slugValid = isValidSlug(state.draft.slug);
+      const dirty = isNew ? true : (!event || JSON.stringify(toDraft(event)) !== JSON.stringify(state.draft));
+      const accent = ACCENT_HEX_LOCAL[state.draft.accentColor] || "#e11d48";
+      const themeButtons = ["light", "dark", "retro", "elegant"].map((t) => {
+        const active = state.draft.theme === t;
+        const swatch = THEME_SWATCH[t].map((c) => '<span class="h-5 w-5 rounded-full" style="background:' + c + ';border:1px solid rgba(0,0,0,0.1);"></span>').join("");
+        return `<button type="button" data-theme-pick="${t}" class="rounded-xl border-2 p-3 text-right" style="border-color:${active ? "var(--primary)" : "var(--border)"};box-shadow:${active ? "0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent)" : "none"};transition:all 0.15s;">
+          <div class="flex gap-1">${swatch}</div>
+          <p class="mt-2 text-sm font-semibold">${THEME_LABELS[t]}</p>
+          <p class="text-[11px]" style="color:var(--muted-foreground);">${THEME_DESC[t]}</p>
+        </button>`;
+      }).join("");
+      const accentOptions = ACCENT_COLORS.map((c) => '<option value="' + c + '"' + (state.draft.accentColor === c ? " selected" : "") + ">" + ACCENT_LABELS[c] + "</option>").join("");
+      return `
+        <div class="grid gap-6 lg:grid-cols-[1fr_minmax(320px,420px)]">
+          <div class="space-y-6">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                ${isNew ? '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);"><path d="M5 12h14"/><path d="M12 5v14"/></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>'}
+                <h2 class="text-xl font-semibold">${isNew ? "צרו אירוע חדש" : "עריכת הזמנה"}</h2>
+              </div>
+              <div class="flex items-center gap-2">
+                ${isNew ? '<button id="cancel-new-btn" class="btn btn-ghost">ביטול</button>' : '<button id="delete-btn" class="btn btn-destructive"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> מחיקה</button>'}
+                <button id="save-btn" class="btn btn-primary" ${!dirty || !slugValid ? "disabled" : ""}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/></svg>${isNew ? "צרו אירוע" : "שמירת שינויים"}</button>
+              </div>
+            </div>
+            <div class="space-y-5 rounded-xl border p-5 sm:p-6" style="border-color:var(--border);background:var(--card);">
+              <div>
+                <label class="label" for="f-title">כותרת האירוע</label>
+                <input class="field" id="f-title" value="${escapeHtml(state.draft.title)}" placeholder="לדוגמה: מסיבת גן לקראת יום השוויון" maxlength="200" />
+              </div>
+              <div>
+                <label class="label" for="f-slug">כתובת האירוע</label>
+                <div class="relative">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);color:var(--muted-foreground);"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                  <input class="field" id="f-slug" value="${escapeHtml(state.draft.slug)}" placeholder="my-party" dir="ltr" style="padding-right:2.25rem;font-family:monospace;text-align:left;" maxlength="60" autocomplete="off" spellcheck="false" />
+                </div>
+                <div class="mt-2 flex items-center gap-1.5 text-xs" dir="ltr"><span style="color:var(--muted-foreground);">fete.app/</span><span style="font-family:monospace;font-weight:600;${slugValid ? "" : "color:var(--muted-foreground);"}">${escapeHtml(state.draft.slug || "my-party")}</span></div>
+                <p class="mt-1 text-xs" style="color:var(--muted-foreground);">זה הקישור שהאורחים שלכם יבקרו בו. השתמשו באותיות קטנות באנגלית, מספרים ומקפים.</p>
+              </div>
+              <div>
+                <label class="label" for="f-desc">תיאור</label>
+                <textarea class="field" id="f-desc" rows="5" maxlength="5000" style="resize:vertical;">${escapeHtml(state.draft.description)}</textarea>
+                <p class="mt-1 text-xs" style="color:var(--muted-foreground);">${state.draft.description.length.toLocaleString("he-IL")} / 5,000 תווים · טקסט פשוט עם שורות חדשות</p>
+              </div>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div><label class="label" for="f-date">תאריך</label><input class="field" id="f-date" type="date" value="${escapeHtml(state.draft.eventDate)}" /></div>
+                <div><label class="label" for="f-time">שעה</label><input class="field" id="f-time" type="time" value="${escapeHtml(state.draft.eventTime)}" /></div>
+              </div>
+              <div><label class="label" for="f-loc">מיקום</label><input class="field" id="f-loc" value="${escapeHtml(state.draft.location)}" placeholder="שם המקום והכתובת" maxlength="300" /></div>
+              <div>
+                <label class="label">עיצוב חזותי</label>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">${themeButtons}</div>
+              </div>
+              <div>
+                <label class="label" for="f-accent">צבע הדגשה</label>
+                <div class="flex items-center gap-3">
+                  <select class="field" id="f-accent" style="width:180px;">${accentOptions}</select>
+                  <div class="h-8 w-8 rounded-full" style="background:${accent};border:2px solid var(--border);"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="lg:sticky lg:top-6 lg:self-start">
+            <div class="mb-2 flex items-center gap-2 text-sm font-medium" style="color:var(--muted-foreground);"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> תצוגה מקדימה חיה</div>
+            <div class="overflow-hidden rounded-2xl border" style="border-color:var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+              <div class="flex items-center gap-2 border-b px-3 py-2" style="border-color:var(--border);background:var(--muted);">
+                <span class="h-2.5 w-2.5 rounded-full" style="background:#f87171;"></span><span class="h-2.5 w-2.5 rounded-full" style="background:#fbbf24;"></span><span class="h-2.5 w-2.5 rounded-full" style="background:#34d399;"></span>
+                <span class="mr-2 truncate text-xs" dir="ltr" style="font-family:monospace;color:var(--muted-foreground);">${guestUrl(state.draft.slug || "my-party")}</span>
+              </div>
+              ${renderPreview(state.draft, accent)}
+            </div>
+            ${dirty && !isNew ? '<p class="mt-2 text-center text-xs" style="color:#d97706;">שינויים לא שמורים — לחצו על "שמירת שינויים" כדי לפרסם.</p>' : ""}
+          </div>
+        </div>`;
+    }
+
+    function renderPreview(draft, accent) {
+      const dateInfo = formatDate(draft.eventDate);
+      const weekday = dateInfo.weekday || "הוזמנת";
+      const fullDate = dateInfo.full || "טרם פורסם";
+      const time = draft.eventTime || "טרם פורסם";
+      const row = (icon, text) => `<div class="flex items-center gap-2 text-sm"><span style="color:${accent};">${icon}</span><span class="truncate">${escapeHtml(text)}</span></div>`;
+      return `
+        <div data-theme="${draft.theme}" style="position:relative;">
+          <div class="max-h-[460px] overflow-y-auto themed-scroll p-5 sm:p-6" style="background:var(--background);color:var(--foreground);font-family:var(--party-font);">
+            <p class="text-[11px] font-semibold uppercase" style="color:${accent};letter-spacing:0.25em;">${escapeHtml(weekday)}</p>
+            <h3 class="mt-2 text-2xl font-bold leading-tight">${escapeHtml(draft.title || "כותרת האירוע שלכם")}</h3>
+            ${draft.description ? '<p class="mt-3 line-clamp-4 text-sm" style="color:var(--muted-foreground);">' + escapeHtml(draft.description) + "</p>" : ""}
+            <div class="mt-4 grid gap-2">
+              ${row('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>', fullDate)}
+              ${row('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>', time)}
+              ${row('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>', draft.location || "טרם פורסם")}
+            </div>
+            <div class="mt-5 rounded-lg p-3 text-center text-sm font-medium" style="background:${accent};color:white;">אני מגיע/ה!</div>
+          </div>
+        </div>`;
+    }
+
+    function renderGuestList(sel) {
+      const guests = state.guests;
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const todayCount = guests.filter((g) => new Date(g.createdAt) >= today).length;
+      const statCard = (icon, label, value) => `<div class="rounded-xl border p-4" style="border-color:var(--border);background:var(--card);"><div class="flex items-center gap-2" style="color:var(--muted-foreground);">${icon}<span class="text-xs font-medium">${label}</span></div><p class="mt-1 text-2xl font-bold tabular-nums">${value}</p></div>`;
+      let tableBody;
+      if (state.guestsLoading) {
+        tableBody = Array.from({ length: 5 }).map(() => '<tr class="border-b" style="border-color:color-mix(in srgb, var(--border) 60%, transparent);"><td class="px-4 py-3"><div class="skeleton h-4 w-4"></div></td><td class="px-4 py-3"><div class="skeleton h-4 w-24"></div></td><td class="px-4 py-3"><div class="skeleton h-4 w-28"></div></td><td class="px-4 py-3"><div class="skeleton h-4 w-20"></div></td></tr>').join("");
+      } else if (guests.length === 0) {
+        tableBody = `<tr><td colspan="4" class="px-4 py-16 text-center"><div class="mx-auto flex max-w-xs flex-col items-center gap-2"><div class="flex h-12 w-12 items-center justify-center rounded-full" style="background:var(--muted);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-foreground);"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></div><p class="font-medium">אין עדיין אישורי הגעה</p><p class="text-sm" style="color:var(--muted-foreground);">שתפו את קישור ההזמנה — אורחים יופיעו כאן בזמן אמת.</p></div></td></tr>`;
+      } else {
+        tableBody = guests.map((g, i) => `<tr class="border-b" style="border-color:color-mix(in srgb, var(--border) 60%, transparent);" onmouseover="this.style.background='color-mix(in srgb, var(--muted) 40%, transparent)';" onmouseout="this.style.background='';">
+          <td class="px-4 py-3" style="color:var(--muted-foreground);">${i + 1}</td>
+          <td class="px-4 py-3 font-medium">${escapeHtml(g.firstName)}</td>
+          <td class="px-4 py-3 font-medium">${escapeHtml(g.lastName)}</td>
+          <td class="px-4 py-3"><div class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full" style="background:#10b981;"></span><span style="color:var(--muted-foreground);" title="${escapeHtml(formatFull(g.createdAt))}">${escapeHtml(formatTimeAgo(g.createdAt))}</span></div></td>
+        </tr>`).join("");
+      }
+      return `
+        <div class="space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div><h2 class="text-xl font-semibold">רשימת אורחים</h2><p class="text-sm" style="color:var(--muted-foreground);">אישורי הגעה חיים עבור <span class="font-medium" style="color:var(--foreground);">${escapeHtml(sel.title)}</span></p></div>
+            <div class="flex items-center gap-2">
+              <button id="refresh-guests" class="btn btn-outline btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> רענן</button>
+              <button id="export-csv" class="btn btn-primary btn-sm" ${guests.length === 0 ? "disabled" : ""}><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> ייצוא CSV</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            ${statCard('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>', "סה״כ אישורים", guests.length)}
+            ${statCard('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>', "נרשמו היום", todayCount)}
+            ${statCard('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/></svg>', "מציג", guests.length)}
+          </div>
+          <div class="overflow-hidden rounded-xl border" style="border-color:var(--border);">
+            <div class="max-h-[460px] overflow-y-auto themed-scroll">
+              <table class="w-full text-sm">
+                <thead class="sticky top-0" style="background:color-mix(in srgb, var(--muted) 80%, transparent);backdrop-filter:blur(4px);">
+                  <tr class="border-b text-right" style="border-color:var(--border);"><th class="px-4 py-3 font-semibold">#</th><th class="px-4 py-3 font-semibold">שם פרטי</th><th class="px-4 py-3 font-semibold">שם משפחה</th><th class="px-4 py-3 font-semibold">נרשם</th></tr>
+                </thead>
+                <tbody>${tableBody}</tbody>
+              </table>
+            </div>
+          </div>
+          ${!state.guestsLoading && guests.length > 0 ? '<p class="text-xs" style="color:var(--muted-foreground);">מציג ' + guests.length + ' אורחים · מתרענן כל 15 שניות</p>' : ""}
+        </div>`;
+    }
+
+    /* ---- Helpers ---- */
+    function toDraft(e) {
+      return { id: e.id, slug: e.slug, title: e.title, description: e.description, eventDate: e.eventDate, eventTime: e.eventTime, location: e.location, theme: e.theme, accentColor: e.accentColor };
+    }
+    function EMPTY_DRAFT() {
+      return { slug: "", title: "", description: "", eventDate: "", eventTime: "", location: "", theme: "light", accentColor: "rose" };
+    }
+
+    function setDraftField(key, value) {
+      state.draft = { ...state.draft, [key]: value };
+    }
+
+    function refreshEditorInputs() {
+      // Re-render the editor to reflect draft changes in the live preview,
+      // save-button state, and slug preview — while preserving field focus.
+      const sel = selectedEvent();
+      const isNew = state.view === "new";
+      // The editor lives inside #tab-content (existing event) or #main-content (new event)
+      const container = $("#tab-content") || $("#main-content");
+      if (!container) return;
+      const active = document.activeElement;
+      const activeId = active ? active.id : null;
+      const cursor = active && active.selectionStart != null ? active.selectionStart : null;
+      container.innerHTML = renderEditor(sel, isNew);
+      if (activeId) {
+        const restored = document.getElementById(activeId);
+        if (restored) {
+          restored.focus();
+          if (cursor != null && typeof restored.setSelectionRange === "function") {
+            restored.setSelectionRange(cursor, cursor);
+          }
+        }
+      }
+      bindEditor();
+    }
+
+    /* ---- Binding ---- */
+    function bindDashboard(sel) {
+      $("#new-event-btn").addEventListener("click", () => {
+        state.view = "new";
+        state.draft = EMPTY_DRAFT();
+        state.slugTouched = false;
+        state.tab = "edit";
+        render();
+      });
+      $("#logout-btn").addEventListener("click", async () => {
+        await logout();
+        state.authed = false;
+        render();
+        showToast("התנתקת");
+      });
+      document.querySelectorAll(".event-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.selectedId = btn.dataset.eventId;
+          state.view = "edit";
+          state.draft = null;
+          state.tab = "edit";
+          render();
+        });
+      });
+      const emptyNew = $("#empty-new-btn");
+      if (emptyNew) emptyNew.addEventListener("click", () => {
+        state.view = "new"; state.draft = EMPTY_DRAFT(); state.slugTouched = false; render();
+      });
+      const tabEdit = $("#tab-edit");
+      if (tabEdit) tabEdit.addEventListener("click", () => { state.tab = "edit"; state.draft = null; render(); });
+      const tabGuests = $("#tab-guests");
+      if (tabGuests) {
+        tabGuests.addEventListener("click", () => {
+          state.tab = "guests"; state.guestsLoading = true; state.guests = []; render(); loadGuests(sel);
+        });
+      }
+      if (state.tab === "guests" && sel) loadGuests(sel);
+      bindEditor();
+    }
+
+    function bindEditor() {
+      const sel = selectedEvent();
+      const isNew = state.view === "new";
+      const titleEl = $("#f-title");
+      if (titleEl) titleEl.addEventListener("input", (e) => {
+        setDraftField("title", e.target.value);
+        if (!state.slugTouched) setDraftField("slug", slugify(e.target.value));
+        refreshEditorInputs();
+      });
+      const slugEl = $("#f-slug");
+      if (slugEl) slugEl.addEventListener("input", (e) => {
+        const normalized = e.target.value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").slice(0, 60);
+        setDraftField("slug", normalized);
+        state.slugTouched = true;
+        refreshEditorInputs();
+      });
+      const descEl = $("#f-desc");
+      if (descEl) descEl.addEventListener("input", (e) => { setDraftField("description", e.target.value); refreshEditorInputs(); });
+      const dateEl = $("#f-date");
+      if (dateEl) dateEl.addEventListener("input", (e) => { setDraftField("eventDate", e.target.value); refreshEditorInputs(); });
+      const timeEl = $("#f-time");
+      if (timeEl) timeEl.addEventListener("input", (e) => { setDraftField("eventTime", e.target.value); refreshEditorInputs(); });
+      const locEl = $("#f-loc");
+      if (locEl) locEl.addEventListener("input", (e) => { setDraftField("location", e.target.value); refreshEditorInputs(); });
+      const accentEl = $("#f-accent");
+      if (accentEl) accentEl.addEventListener("change", (e) => { setDraftField("accentColor", e.target.value); refreshEditorInputs(); });
+      document.querySelectorAll("[data-theme-pick]").forEach((btn) => {
+        btn.addEventListener("click", () => { setDraftField("theme", btn.dataset.themePick); refreshEditorInputs(); });
+      });
+      const saveBtn = $("#save-btn");
+      if (saveBtn) saveBtn.addEventListener("click", () => handleSave(sel, isNew));
+      const delBtn = $("#delete-btn");
+      if (delBtn) delBtn.addEventListener("click", () => handleDelete(sel));
+      const cancelNew = $("#cancel-new-btn");
+      if (cancelNew) cancelNew.addEventListener("click", () => {
+        state.view = "edit"; state.draft = null; render();
+      });
+      const refreshGuests = $("#refresh-guests");
+      if (refreshGuests) refreshGuests.addEventListener("click", () => { if (sel) loadGuests(sel); });
+      const exportCsv = $("#export-csv");
+      if (exportCsv) exportCsv.addEventListener("click", async () => {
+        try { await exportGuestsCsv(sel.id); showToast("רשימת האורחים יוצאה", "הורדת ה-CSV החלה."); }
+        catch (err) { showToast("הייצוא נכשל", err.message, "destructive"); }
+      });
+    }
+
+    async function loadGuests(sel) {
+      state.guestsLoading = true;
+      try {
+        const { guests } = await fetchGuests(sel.id);
+        state.guests = guests;
+      } catch (err) {
+        showToast("טעינת האורחים נכשלה", err.message, "destructive");
+      } finally {
+        state.guestsLoading = false;
+        if (state.tab === "guests") render();
+      }
+    }
+
+    async function handleSave(sel, isNew) {
+      const d = state.draft;
+      if (!d.title.trim()) { showToast("נדרשת כותרת", "תנו לאירוע שם לפני השמירה.", "destructive"); return; }
+      if (!isValidSlug(d.slug)) { showToast("כתובת האירוע אינה תקינה", "2 עד 60 תווים: אותיות קטנות באנגלית, מספרים ומקפים.", "destructive"); return; }
+      const saveBtn = $("#save-btn");
+      saveBtn.disabled = true;
+      saveBtn.textContent = "שומר…";
+      const payload = { slug: d.slug, title: d.title.trim(), description: d.description, eventDate: d.eventDate, eventTime: d.eventTime, location: d.location, theme: d.theme, accentColor: d.accentColor };
+      try {
+        let updated;
+        if (isNew) {
+          const res = await createEvent(payload);
+          updated = res.event;
+          showToast("האירוע נוצר", updated.title);
+        } else {
+          const res = await updateEvent(sel.id, payload);
+          updated = res.event;
+          showToast("האירוע נשמר", updated.title);
+        }
+        // Update state
+        const idx = state.events.findIndex((e) => e.id === updated.id);
+        const withCount = { ...updated, guestCount: idx >= 0 ? state.events[idx].guestCount : 0 };
+        if (idx >= 0) state.events[idx] = withCount; else state.events.unshift(withCount);
+        state.selectedId = updated.id;
+        state.view = "edit";
+        state.draft = null;
+        render();
+      } catch (err) {
+        showToast("השמירה נכשלה", err.message, "destructive");
+        saveBtn.disabled = false;
+        saveBtn.textContent = isNew ? "צרו אירוע" : "שמירת שינויים";
+      }
+    }
+
+    async function handleDelete(sel) {
+      if (!confirm('למחוק אירוע זה?\nפעולה זו תסיר לצמיתות את "' + sel.title + '" ואת כל אישורי ההגעה שלו.')) return;
+      try {
+        await deleteEvent(sel.id);
+        state.events = state.events.filter((e) => e.id !== sel.id);
+        state.selectedId = state.events[0] ? state.events[0].id : null;
+        state.draft = null;
+        showToast("האירוע הוסר", "האורחים נמחקו גם כן.");
+        render();
+      } catch (err) {
+        showToast("המחיקה נכשלה", err.message, "destructive");
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

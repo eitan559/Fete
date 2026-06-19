@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fête — הזמנות למסיבות ואישורי הגעה</title>
+  <meta name="description" content="צרו הזמנות מהממות לאירועים, אספו אישורי הגעה תוך שניות, ונהלו את רשימת האורחים בקלות." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/theme.css" />
+  <link rel="icon" href="/logo.svg" />
+</head>
+<body>
+  <div class="mx-auto flex min-h-screen max-w-6xl flex-col px-4 pb-16 sm:px-6">
+    <!-- Header -->
+    <header class="flex items-center justify-between py-6">
+      <a href="/" class="flex items-center gap-2 no-underline" style="color:inherit;">
+        <div class="flex h-9 w-9 items-center justify-center rounded-xl" style="background:var(--primary);color:var(--primary-foreground);box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-1.5.5a2 2 0 0 1-2.55-2.55L18.5 9.5"/></svg>
+        </div>
+        <span class="text-lg font-bold tracking-tight">Fête</span>
+      </a>
+      <a href="/admin.html" class="btn btn-ghost btn-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        כניסת מארגן
+      </a>
+    </header>
+
+    <!-- Hero -->
+    <section class="py-12 text-center sm:py-16 animate-fade-in-up">
+      <div class="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm" style="border-color:var(--border);background:var(--card);color:var(--muted-foreground);box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/></svg>
+        הזמנות מהממות, אישורי הגעה פשוטים
+      </div>
+      <h1 class="mx-auto max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
+        הוזמנת ל <span class="shimmer-text">משהו מיוחד</span>
+      </h1>
+      <p class="mx-auto mt-5 max-w-xl text-base sm:text-lg" style="color:var(--muted-foreground);">
+        בחרו אירוע למטה כדי לצפות בהזמנה ולאשר הגעה תוך שניות. לא צריך חשבון — רק את השם שלכם.
+      </p>
+    </section>
+
+    <!-- Events grid -->
+    <section class="flex-1">
+      <div class="mb-5 flex items-center justify-between">
+        <h2 class="text-lg font-semibold">
+          אירועים קרובים <span id="events-count" class="ml-2 text-sm font-normal" style="color:var(--muted-foreground);"></span>
+        </h2>
+      </div>
+      <div id="events-grid" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <!-- Loading skeletons -->
+        <div class="skeleton h-72 rounded-2xl"></div>
+        <div class="skeleton h-72 rounded-2xl"></div>
+        <div class="skeleton h-72 rounded-2xl"></div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="mt-16 border-t pt-6 text-center text-xs" style="border-color:var(--border);color:var(--muted-foreground);">
+      <p><span class="font-semibold">Fête</span> — הזמנות למסיבות ואישורי הגעה, בקלות וביופי.</p>
+      <p class="mt-1">אתם המארחים? <a href="/admin.html" class="font-medium underline-offset-4 hover:underline" style="color:var(--foreground);">התחברו כדי לנהל אירועים</a></p>
+    </footer>
+  </div>
+
+  <script src="/common.js"></script>
+  <script>
+    (async function () {
+      const grid = document.getElementById("events-grid");
+      const countEl = document.getElementById("events-count");
+      try {
+        const { events } = await fetchEvents();
+        countEl.textContent = "(" + events.length + ")";
+        if (events.length === 0) {
+          grid.innerHTML = `
+            <div class="col-span-full rounded-2xl border border-dashed p-12 text-center" style="border-color:var(--border);background:color-mix(in srgb, var(--card) 50%, transparent);">
+              <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full" style="background:var(--muted);">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-foreground);"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-1.5.5a2 2 0 0 1-2.55-2.55L18.5 9.5"/></svg>
+              </div>
+              <h3 class="mt-4 text-lg font-semibold">אין עדיין אירועים</h3>
+              <p class="mt-1 text-sm" style="color:var(--muted-foreground);">המארגן עדיין לא פרסם מסיבות. חיזרו בקרוב!</p>
+              <a href="/admin.html" class="btn btn-outline mt-5">כניסת מארגן</a>
+            </div>`;
+          return;
+        }
+        grid.innerHTML = events.map((e, i) => {
+          const accent = accentHex(e.accentColor);
+          const d = e.eventDate ? new Date(e.eventDate + "T00:00:00") : null;
+          const dateBadge = d
+            ? '<div class="absolute bottom-3 right-4 flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold" style="background:color-mix(in srgb, var(--background) 90%, transparent);backdrop-filter:blur(4px);box-shadow:0 1px 2px rgba(0,0,0,0.05);">' +
+              '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:' + accent + ';"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>' +
+              d.toLocaleDateString("he-IL", { month: "short", day: "numeric" }) + "</div>"
+            : "";
+          const swatch = (THEME_SWATCH[e.theme] || []).map(c =>
+            '<span class="h-6 w-6 rounded-full border-2" style="background:' + c + ';border-color:rgba(255,255,255,0.7);box-shadow:0 1px 2px rgba(0,0,0,0.1);"></span>'
+          ).join("");
+          return `
+            <a href="${guestUrl(e.slug)}" class="group relative flex flex-col overflow-hidden rounded-2xl no-underline animate-fade-in-up" style="color:inherit;background:var(--card);border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.05);transition:box-shadow 0.2s,transform 0.2s;animation-delay:${i * 60}ms;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 10px 30px -5px rgba(0,0,0,0.15)';" onmouseout="this.style.transform='';this.style.boxShadow='0 1px 3px rgba(0,0,0,0.05)';">
+              <div class="relative h-28 overflow-hidden" style="background:linear-gradient(135deg, ${accent}22 0%, ${accent}05 100%);">
+                <div class="absolute inset-0 flex items-center justify-between p-4">
+                  <div class="flex gap-1.5">${swatch}</div>
+                  <span class="badge">${THEME_LABELS[e.theme] || e.theme}</span>
+                </div>
+                ${dateBadge}
+              </div>
+              <div class="flex flex-1 flex-col p-5">
+                <h3 class="text-lg font-bold leading-snug" style="transition:color 0.2s;" onmouseover="this.style.color='var(--primary)';" onmouseout="this.style.color='';">${escapeHtml(e.title)}</h3>
+                <p class="mt-2 line-clamp-2 flex-1 text-sm" style="color:var(--muted-foreground);">${escapeHtml(e.description || "פרטים יפורסמו בקרוב — אשרו הגעה כדי לשריין את מקומכם!")}</p>
+                <div class="mt-4 space-y-1.5 text-sm">
+                  ${e.eventTime ? '<div class="flex items-center gap-2" style="color:var(--muted-foreground);"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:' + accent + ';"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' + escapeHtml(e.eventTime) + "</div>" : ""}
+                  ${e.location ? '<div class="flex items-center gap-2" style="color:var(--muted-foreground);"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:' + accent + ';"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg><span class="truncate">' + escapeHtml(e.location) + "</span></div>" : ""}
+                </div>
+                <div class="mt-4 flex items-center justify-between border-t pt-4" style="border-color:var(--border);">
+                  <span class="inline-flex items-center gap-1.5 text-sm" style="color:var(--muted-foreground);">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    ${e.guestCount} ${e.guestCount === 1 ? "אורח" : "אורחים"}
+                  </span>
+                  <span class="inline-flex items-center gap-1 text-sm font-semibold" style="color:var(--primary);">צפו בהזמנה
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                  </span>
+                </div>
+              </div>
+            </a>`;
+        }).join("");
+      } catch (err) {
+        grid.innerHTML = '<div class="col-span-full rounded-2xl border border-dashed p-12 text-center" style="border-color:var(--border);"><p class="font-medium">טעינת האירועים נכשלה</p><p class="mt-1 text-sm" style="color:var(--muted-foreground);">' + escapeHtml(err.message) + "</p></div>";
+      }
+    })();
+  </script>
+</body>
+</html>
